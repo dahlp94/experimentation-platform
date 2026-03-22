@@ -1,0 +1,29 @@
+random_seed: 42
+
+experiment:
+  experiment_id: "exp_001"
+  experiment_name: "homepage_cta_test"
+  status: "completed"
+  start_ts: "2026-02-01T00:00:00"
+  end_ts: "2026-02-14T23:59:59"
+  primary_metric: "conversion"
+  randomization_unit: "user"
+  control_label: "control"
+  treatment_label: "treatment"
+  hypothesis_direction: "increase"
+
+population:
+  n_users: 10000
+
+assignment:
+  traffic_fraction: 1.0
+  treatment_probability: 0.5
+
+behavior:
+  mean_sessions_per_user: 3.5
+  control_conversion_prob: 0.08
+  treatment_conversion_prob: 0.10
+  add_to_cart_prob: 0.18
+  purchase_amount_mean: 75.0
+  purchase_amount_std: 30.0
+  include_pre_period_events: true
