@@ -1,0 +1,10 @@
+.env
+venv/
+venv_exp_platform/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+data/synthetic/*.csv
+data/processed/
