@@ -1,114 +1,196 @@
 # Experimentation Platform
 
-This repository contains a production-style experimentation platform focused on correct assignment, raw behavioral event logging, and reproducible synthetic data generation. Week 1 establishes the data foundation for the project: a PostgreSQL schema, a config-driven simulator, CSV export, bulk load scripts, data verification, and automated integrity tests.
+A production-style experimentation platform that models the full lifecycle of A/B testing: data generation, assignment, behavioral logging, validation, and reproducible pipelines.
 
-## Week 1 Summary
+This project is designed to demonstrate both statistical rigor and industry-level system design, bridging the gap between experimental methodology and production data workflows.
 
-Week 1 completed the relational and simulation backbone of the project.
+---
 
-- **Schema:** four core tables (`users`, `experiments`, `assignments`, `events`) with indexes and a unique constraint on `(experiment_id, user_id)` in `assignments`.
-- **Synthetic pipeline:** YAML-driven configuration, seeded random number generation, and CSV export under `data/synthetic/`.
-- **Database workflow:** scripts to apply schema DDL, load CSVs in dependency order, and verify loaded data with quick sanity checks.
-- **Validation:** pytest coverage for generator outputs, assignment rules, and event integrity.
-- **Event-window enforcement:** experiment-period events are constrained to occur within the configured experiment window.
+## Project Overview
+
+Modern experimentation systems require more than computing metrics. They require:
+
+- correct assignment design
+- reliable event logging
+- reproducible data pipelines
+- integrity validation
+- structured outputs for downstream analysis
+
+This project builds that foundation end-to-end.
+
+---
+
+## Week 1: Data Foundation (Completed)
+
+Week 1 establishes a robust and reproducible experimentation data layer.
+
+### Key Components
+
+- **Relational Schema**
+  - Four core tables: `users`, `experiments`, `assignments`, `events`
+  - Indexing and constraint enforcement
+  - Unique constraint on `(experiment_id, user_id)` to ensure valid randomization
+
+- **Synthetic Data Pipeline**
+  - Config-driven simulation using YAML
+  - Deterministic random generation via seeded RNG
+  - Realistic behavioral event generation
+
+- **Data Engineering Workflow**
+  - Schema creation via SQL scripts
+  - CSV-based intermediate storage
+  - Bulk loading into PostgreSQL
+  - Idempotent reload process
+
+- **Validation and Testing**
+  - Pytest-based integrity tests
+  - Assignment correctness validation
+  - Event consistency checks
+  - Experiment window enforcement
+
+---
 
 ## Data Model
 
-| Table | Role |
-| ----- | ---- |
-| **users** | Stable user dimensions such as signup time, country, platform, segment, and premium flag. |
-| **experiments** | Metadata for each experiment, including start/end window, metric, labels, and randomization unit. |
-| **assignments** | Which variant each user received and when; one row per user per experiment. |
-| **events** | Timestamped raw behavioral logs such as `session_start`, `page_view`, `add_to_cart`, `conversion`, `purchase`, and optional pre-period activity. |
+| Table | Description |
+|------|------------|
+| **users** | User-level attributes including signup time, country, platform, and segmentation features |
+| **experiments** | Experiment metadata including time window, metric, and variant labels |
+| **assignments** | Variant assignment per user; one row per user per experiment |
+| **events** | Raw behavioral logs such as sessions, page views, conversions, and purchases |
 
-`event_value` stores numeric payloads when relevant, such as purchase amount. `metadata_json` stores small structured context as JSON.
+Additional fields:
 
-## Why This Design Is Correct
+- `event_value`: numeric payload (e.g., purchase amount)
+- `metadata_json`: structured context for events
 
-- **Assignment and behavior are separated:** exposure is recorded once in `assignments`, while user response is recorded in `events`. This avoids mixing experimental design and outcomes in a single flat table.
-- **User-level randomization is enforced:** the unique constraint on `(experiment_id, user_id)` guarantees one assignment per user per experiment, matching the configured randomization unit.
-- **Events are stored as raw logs:** the data resembles production event streams and can later support SQL metric construction and statistical inference without re-simulating behavior.
-- **Reproducibility is built in:** the `random_seed` in `configs/simulation_config.yaml` and centralized RNG setup make the pipeline deterministic for testing and demos.
-- **Experiment-period integrity is enforced:** post-assignment events are generated within the experiment window, which keeps downstream metric computation clean and well-defined.
+---
+
+## Design Principles
+
+### 1. Separation of Assignment and Behavior
+Assignments are recorded once and independently of user actions. Behavioral outcomes are logged separately, ensuring clean causal structure.
+
+### 2. User-Level Randomization
+Each user receives exactly one assignment per experiment, enforced via database constraints.
+
+### 3. Event-Driven Architecture
+Events are stored as raw logs, enabling flexible downstream aggregation and analysis without recomputation.
+
+### 4. Reproducibility
+All data generation is controlled by configuration and a fixed random seed, ensuring consistent outputs across runs.
+
+### 5. Experiment Window Integrity
+All post-assignment events are constrained within the experiment window, preventing temporal leakage into analysis.
+
+---
 
 ## How to Run
 
-Prerequisites: Python 3.11+, PostgreSQL, and a valid `DATABASE_URL`.
+### Prerequisites
+- Python 3.11+
+- PostgreSQL
+- Valid `DATABASE_URL`
 
-1. **Environment**
+---
 
-   ```bash
-   cp .env.example .env
-   # Set DATABASE_URL in .env
-   # Example: postgresql://user:pass@localhost:5432/exp_platform
+### 1. Environment Setup
 
-   python -m venv venv_exp_platform
-   source venv_exp_platform/bin/activate
-   pip install -r requirements.txt
+```bash
+cp .env.example .env
+# Set DATABASE_URL in .env
+# Example:
+# postgresql://user:password@localhost:5432/exp_platform
+
+python -m venv venv_exp_platform
+source venv_exp_platform/bin/activate
+pip install -r requirements.txt
 ````
 
-2. **Create schema**
+---
 
-   ```bash
-   python scripts/create_schema.py
-   ```
+### 2. Create Schema
 
-3. **Generate synthetic CSVs**
+```bash
+python scripts/create_schema.py
+```
 
-   ```bash
-   python scripts/generate_synthetic_data.py
-   ```
+---
 
-4. **Load into PostgreSQL**
+### 3. Generate Synthetic Data
 
-   ```bash
-   python scripts/load_synthetic_data.py
-   ```
+```bash
+python scripts/generate_synthetic_data.py
+```
 
-5. **Verify loaded data**
+---
 
-   ```bash
-   python scripts/verify_seed_data.py
-   ```
+### 4. Load Data into PostgreSQL
 
-6. **Run tests**
+```bash
+python scripts/load_synthetic_data.py
+```
 
-   ```bash
-   pytest tests/
-   ```
+---
 
-The load script truncates `events`, `assignments`, `experiments`, and `users` in dependency-safe order before reloading, so repeated runs start from a clean state.
+### 5. Verify Data Integrity
 
-## Week 1 Integrity Guarantees
+```bash
+python scripts/verify_seed_data.py
+```
 
-* one assignment per `(experiment_id, user_id)`
-* assignment and behavior are stored separately
-* experiment-period events occur within the configured experiment window
-* optional pre-period events occur before assignment
-* generated data is reproducible through a fixed random seed
+---
+
+### 6. Run Tests
+
+```bash
+pytest tests/
+```
+
+---
+
+## Data Integrity Guarantees
+
+* One assignment per `(experiment_id, user_id)`
+* Assignment and behavioral data are strictly separated
+* All experiment-period events occur within the experiment window
+* Pre-period events occur strictly before assignment
+* Synthetic data generation is fully reproducible
+
+---
 
 ## Simulation Logic
 
-1. Generate `n_users` with categorical attributes and signup timestamps before the experiment window.
-2. Create one experiment row from configuration.
-3. Assign users into the experiment according to `traffic_fraction` and `treatment_probability`; assignment timestamps occur inside the configured assignment window.
-4. For each assigned user, draw a session count from a Poisson distribution with a minimum of one session.
-5. Place session starts between assignment time and experiment end.
-6. Emit event logs for session activity and funnel behavior:
+1. Generate users with attributes and signup timestamps prior to experiment start
+2. Create experiment metadata from configuration
+3. Assign users based on traffic fraction and treatment probability
+4. Generate session activity between assignment and experiment end
+5. Simulate behavioral funnel:
 
-   * `session_start`
-   * `page_view`
-   * optional `add_to_cart`
-   * optional `conversion`
-   * `purchase` with positive `event_value` after conversion
-7. Optionally emit pre-period `session_start` and `page_view` events after signup and before assignment.
+   * session_start
+   * page_view
+   * optional add_to_cart
+   * optional conversion
+   * purchase with positive value
+6. Optionally simulate pre-period activity before assignment
 
-Behavioral parameters can be tuned in `configs/simulation_config.yaml`.
+All parameters are configurable via:
+
+```text
+configs/simulation_config.yaml
+```
+
+---
 
 ## Current Status
 
-Week 1 is complete and provides an analysis-ready foundation for Week 2, where the project will build the SQL metric layer:
+Week 1 is complete and provides a clean, validated, and reproducible data foundation.
 
-* `user_metrics`
-* `experiment_metrics`
-* `guardrail_metrics`
+Next steps (Week 2):
+
+* Build SQL metric layer:
+
+  * `user_metrics`
+  * `experiment_metrics`
+  * `guardrail_metrics`
+* Construct analysis-ready datasets for statistical inference
